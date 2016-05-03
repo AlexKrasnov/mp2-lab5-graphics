@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "list.h"
 #include <math.h>
 
 namespace graphics
@@ -10,51 +11,157 @@ namespace graphics
 	using namespace System::Data;
 	using namespace System::Drawing;
 
-	class TObject
+	struct TPoint
+	{
+		int x,y;
+		TPoint(int _x = 0, int _y = 0) : x(_x),y(_y) {}
+	};
+
+	class TShape
 	{
 	protected:
 		bool Visible, Active;
 	public:
-		TObject():Visible(false),Active(false){};
-		virtual void Show(Graphics ^g)=0;
-		virtual void Hide(Graphics ^g)=0;
-		virtual void Move(Graphics ^g,int dx,int dy)=0;
-		virtual int GetX(Graphics ^g)=0;
-		virtual int GetY(Graphics ^g)=0;
+		TShape():Visible(false),Active(false){};
+		virtual TPoint Show(Graphics ^g)=0;
+		virtual TPoint Hide(Graphics ^g)=0;
+		//virtual void Move(Graphics ^g,int dx,int dy)=0;
+		//virtual int GetX(Graphics ^g)=0;
+		//virtual int GetY(Graphics ^g)=0;
 	};
 
-	class TPoint: public TObject
+	class TShapePoint : public TShape
 	{
-	protected:
-		int x,y;
+		TPoint *p;
 	public:
-		TPoint(int _x1=0,int _y1=0)//:x(_x1),y(_y1)
+		TShapePoint (TPoint *_p) : p(_p) {}
+		TPoint Show(Graphics ^g)
 		{
-			x=_x1;
-			y=_y1;
-			Visible = false;
-			Active = false;
-		}
-		virtual void Show(Graphics ^g)
-		{
-			g->DrawEllipse(Pens::Black,x-2,y-2,4,4);
+			g->DrawEllipse(Pens::Black,p->x-2,p->y-2,4,4);
 			Visible=true;
 			Active=true;
+			return *p;
 		}
-		virtual void Hide(Graphics ^g)
+		TPoint Hide(Graphics ^g)
 		{
-			g->DrawEllipse(Pens::White,x-2,y-2,4,4);
+			g->DrawEllipse(Pens::White,p->x-2,p->y-2,4,4);
+			Visible=false;
+			Active=false;
+			return *p;
+		}
+	};
+
+	class TShapeLine : public TShape
+	{
+		TShape *l, *r;
+	public:
+		TShapeLine (TShape *_l, TShape *_r) : l(_l), r(_r) {}
+		TPoint Show (Graphics ^g)
+		{
+			TPoint rp, lp;
+			rp = r->Hide(g);
+			lp = l->Hide(g);
+			g->DrawLine(Pens::Black, rp.x, rp.y, lp.x, lp.y);
+			Active = true;
+			Visible = true;
+			return lp;
+		}
+		TPoint Hide (Graphics ^g)
+		{
+			TPoint rp, lp;
+			rp = r->Hide(g);
+			l->Hide(g);
+			g->DrawLine(Pens::White, rp.x, rp.y, lp.x, lp.y);
+			Active = false;
+			Visible = false;
+			return lp;
+		}
+	};
+
+	class TRectangle: public TShape
+	{
+	protected:
+		TShape *l, *r;
+	public:
+		TRectangle(TShape *_l, TShape *_r):l(_l),r(_r) {}
+		TPoint Show(Graphics ^g)
+		{
+			TPoint rp, lp;
+			rp = r->Hide(g);
+			lp = l->Hide(g);
+			g->DrawRectangle(Pens::Black,Math::Min(rp.x,lp.x),Math::Min(rp.y,lp.y),abs(rp.x-lp.x),abs(rp.y-lp.y));
+			Active = true;
+			Visible = true;
+			return lp;
+		}
+		TPoint Hide(Graphics ^g)
+		{
+			TPoint rp, lp;
+			rp = r->Hide(g);
+			lp = l->Hide(g);
+			g->DrawRectangle(Pens::White,Math::Min(rp.x,lp.x),Math::Min(rp.y,lp.y),abs(rp.x-lp.x),abs(rp.y-lp.y));
+			Active = false;
+			Visible = false;
+			return lp;
+		}
+	};
+
+	class TEllipse: public TShape
+	{
+	protected:
+		TShape *l, *r;
+	public:
+		TEllipse(TShape *_l, TShape *_r):l(_l),r(_r) {}
+		TPoint Show(Graphics ^g)
+		{
+			TPoint rp, lp;
+			rp = r->Hide(g);
+			lp = l->Hide(g);
+			g->DrawEllipse(Pens::Black,Math::Min(rp.x,lp.x),Math::Min(rp.y,lp.y),abs(rp.x-lp.x),abs(rp.y-lp.y));
+			Visible=true;
+			Active=true;
+			return lp;
+		}
+		TPoint Hide(Graphics ^g)
+		{
+			TPoint rp, lp;
+			rp = r->Hide(g);
+			lp = l->Hide(g);
+			g->DrawEllipse(Pens::White,Math::Min(rp.x,lp.x),Math::Min(rp.y,lp.y),abs(rp.x-lp.x),abs(rp.y-lp.y));
+			Visible=false;
+			Active=false;
+			return lp;
+		}
+	};
+
+	class TGroup :public TShape
+	{
+	protected:
+		TList<TShape*> List;
+	public:
+		void InsertUnit(TShape *unit)
+		{
+			List.AddFirst(unit);
+		}
+		TPoint Show(Graphics ^g)
+		{
+			for (List.Reset(); !List.IsEnd(); List.GoNext())
+			{
+				List.GetCurrentVal()->Show(g);
+			}
+			Active = true;
+			Visible = true;
+		}
+		TPoint Hide(Graphics ^g)
+		{
+			for (List.Reset(); !List.IsEnd(); List.GoNext())
+			{
+				List.GetCurrentVal()->Hide(g);
+			}
 			Visible=false;
 			Active=false;
 		}
-		virtual void Move(Graphics ^g,int dx, int dy)
-		{
-			Hide(g);
-			x += dx;
-			y += dy;
-			Show(g);
-		}
-		virtual int GetX(Graphics ^g){return x;}
-		virtual int GetY(Graphics ^g){return y;}
 	};
+
+
 }
